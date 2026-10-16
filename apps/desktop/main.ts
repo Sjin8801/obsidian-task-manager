@@ -1,11 +1,13 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, Notification, protocol, screen, session, Tray } from 'electron';
 import { existsSync, realpathSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { appendFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { HeadlessSync, locateHeadless, preflightSync, runCommand, spawnHeadless, type SyncTimings } from './headless-sync.ts';
 import { syncAlert, trayLabel } from './sync-messages.ts';
 import { SyncSettings } from './sync-store.ts';
 import { loginItemName, loginItemState, repairLegacyLoginItem } from './login-item.ts';
+import { importProfile, readStartupEntry, sourceProfileFrom, type RunProgram, type StartupEntry } from './import-profile.ts';
 import { LocalVault, selectVault, selectTaskFolder, validSelection, VaultError } from './local-vault.ts';
 import { ShortcutStore } from './shortcut-store.ts';
 import { CategoryStore } from './category-store.ts';
@@ -49,6 +51,9 @@ let shortcuts: ShortcutStore, language: LanguageStore, applyTrayLanguage: () => 
 // The words of the parts the main process draws itself (tray, menus, dialogs, notifications), in the language chosen now.
 const tm: Translate = (source, params) => translate(language.locale, source, params);
 const profile = (name: string) => path.join(app.getPath('userData'), name);
+const runProgram: RunProgram = (file, args) => new Promise((resolve, reject) => {
+  execFile(file, args, { windowsHide: true, timeout: 10_000, encoding: 'utf8' }, (error, stdout) => error ? reject(error) : resolve(stdout));
+});
 const status = (): DesktopStatus => ({ autoStart: autoStart(), autoStartSupported: process.platform === 'win32', connected: !!vault, language: language.preference, categories: [...(vault?.categories ?? defaultCategoriesFor(language.locale))], vault: vault?.selection ?? null, shortcut: shortcuts.shortcut, shortcutRegistered: shortcuts.registered, shortcutError: shortcuts.error, sync: sync!.status() });
 async function saveSelection(selection: VaultSelection) {
   await mkdir(app.getPath('userData'), { recursive: true });
@@ -70,6 +75,20 @@ else {
   app.on('before-quit', () => { quitting = true; stopWatching?.(); pet?.dispose(); sync?.dispose(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   app.whenReady().then(async () => {
+    // The installed app's first run takes over the settings of a run from source (see import-profile.ts), and its start at login, so
+    // the two do not both start. Isolated profiles (tests) never do this.
+    // Test hooks used only by scripts/smoke-packaged.ts: the entry to read instead of the registry, and a file that records the takeover
+    // instead of Windows.
+    const testEntry = process.env.TASK_TEST_STARTUP_ENTRY;
+    if (app.isPackaged && process.platform === 'win32' && (testEntry || !process.env.TASK_DESKTOP_DATA) && !existsSync(profile('vault.json'))) {
+      try {
+        const entry: StartupEntry = testEntry ? JSON.parse(testEntry) : await readStartupEntry(runProgram), from = sourceProfileFrom(entry.command, process.execPath);
+        if (from && await importProfile(from, app.getPath('userData')) && entry.enabled) {
+          if (testEntry) await appendFile(process.env.TASK_TEST_LOGIN_LOG!, 'takeover\n');
+          else app.setLoginItemSettings({ ...loginOptions, name: loginItemName, openAtLogin: true, enabled: true });
+        }
+      } catch { /* Then the vault is chosen again on the first screen. */ }
+    }
     language = new LanguageStore(profile('language.json'), () => app.getLocale());
     await language.load();
     const categoryStore = new CategoryStore(profile('categories'));
