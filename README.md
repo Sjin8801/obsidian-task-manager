@@ -4,7 +4,7 @@ English · [한국어](README.ko.md)
 
 A small Windows desktop app for the [TaskNotes](https://github.com/callumalpass/tasknotes) tasks in a local Obsidian vault. Today's tasks are one shortcut away in a popup, a mini widget on the desktop shows how many are left, and you change status, dates and relationships with the mouse. The app reads and writes the Markdown files directly: Obsidian does not have to be running, and nothing is sent anywhere.
 
-> **Status:** early, used daily by its author, tested on Windows 11 only. It runs from source (there is no installer yet). The screens are in English and Korean.
+> **Status:** early, used daily by its author, tested on Windows 11 only. It comes as a Windows installer, or runs from source. The screens are in English and Korean.
 > Not affiliated with Obsidian or TaskNotes.
 
 ## Why
@@ -28,13 +28,25 @@ TaskNotes, though, needs Obsidian open, and Obsidian is a full window: not a qui
 - **Mini widget**: "3 tasks today" on the desktop, always on top. Hover to see the list; rest on a task for a second to see its subtasks; click to open it in the app. Drag to move, right-click for options.
 - **Settings** (Ctrl+K → Vault settings): language, light or dark theme, the shortcut, start with Windows, task folder, and an optional [headless sync](#optional-keep-obsidian-sync-running-without-obsidian).
 
-## Requirements
+## Install
 
-- Windows 10 or 11. macOS and Linux are not tested.
-- [Node.js](https://nodejs.org) 24 or newer (it comes with npm) and [Git](https://git-scm.com).
-- An Obsidian vault with TaskNotes tasks. The TaskNotes plugin does not have to be open; if its settings are in the vault the app follows them.
+You need Windows 10 or 11 and an Obsidian vault with TaskNotes tasks. The TaskNotes plugin does not have to be open; if its settings are in the vault the app follows them.
 
-## Install and first run
+1. Download `Obsidian-Task-Manager-Setup-<version>.exe` from [Releases](https://github.com/Sjin8801/obsidian-task-manager/releases/latest) and run it. It installs for your Windows account only (no administrator rights needed) and opens the app.
+2. Windows may say **"Windows protected your PC"**, because the installer is not code-signed. Choose **More info → Run anyway**.
+3. On the first screen choose your Obsidian vault folder. The app reads the tasks in the task folder of your TaskNotes settings, or `TaskNotes/Tasks`, or, if neither exists, the whole vault. You can change the folder later in Vault settings.
+
+## Everyday use
+
+- Open the app from the Start menu or the desktop shortcut, the tray icon, or the shortcut key.
+- **Start with Windows** (Vault settings → Start with Windows): from your next sign-in the app starts by itself, hidden in the tray with the widget showing.
+- Closing the window only hides it. To quit, use the tray icon → Quit.
+- **Updating**: download the newer installer and run it. Your settings stay.
+- **Uninstalling**: Windows Settings → Apps → Installed apps → Obsidian Task Manager. Your settings and backups stay in `%APPDATA%\Obsidian Task Manager`; delete that folder to remove them too.
+
+## Run from source instead
+
+For development, or to try a change before it is released. You need [Node.js](https://nodejs.org) 24 or newer and [Git](https://git-scm.com).
 
 ```sh
 git clone https://github.com/Sjin8801/obsidian-task-manager.git
@@ -43,32 +55,15 @@ npm ci
 npm run desktop
 ```
 
-`npm ci` downloads Electron (about 100 MB) the first time. `npm run desktop` builds the app and opens it.
+`npm ci` downloads Electron (about 100 MB) the first time. `npm run desktop` builds the app and opens it, and the app runs as long as that terminal stays open. To start it without a terminal, turn on Start with Windows, or make a Windows shortcut with this target (use your own folder):
 
-On the first screen choose your Obsidian vault folder. The app reads the tasks in the task folder of your TaskNotes settings, or `TaskNotes/Tasks`, or, if neither exists, the whole vault. You can change the folder later in Vault settings.
-
-## Everyday use
-
-The app runs as long as the terminal that started it with `npm run desktop` stays open. To use it every day without a terminal:
-
-- **Start with Windows** (Vault settings → Start with Windows): from your next sign-in the app starts by itself, hidden in the tray with the widget showing. Turn it on once while the app is running. If you move the project folder, turn it off and on again from the new place.
-- **Or a shortcut**: create a Windows shortcut with this target (use your own folder):
-
-  ```text
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\path\to\obsidian-task-manager\scripts\launch-desktop.ps1"
-  ```
-
-Closing the window only hides it. To quit, use the tray icon → Quit.
-
-### Updating
-
-Quit the app from the tray, then:
-
-```sh
-git pull
-npm ci
-npm run desktop
+```text
+powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\path\to\obsidian-task-manager\scripts\launch-desktop.ps1"
 ```
+
+To update, quit the app from the tray, then `git pull`, `npm ci` and `npm run desktop`. If you move the project folder, turn Start with Windows off and on again from the new place.
+
+**Moving to the installer**: quit the app from the tray, then install. If Start with Windows was on, the installed app's first run copies your settings (vault, categories, shortcut, widget, theme, sync) and takes over starting with Windows. Otherwise choose the vault once more. The backups stay in the project folder.
 
 ## How tasks are found and shown
 
@@ -86,7 +81,7 @@ npm run desktop
 
 ## Where the app keeps its data
 
-In `.local/desktop` inside the project folder: the chosen vault, your settings, and `task-backups` with a copy of each note before it was changed. The backups are never deleted automatically. Deleting the project folder, or running `git clean -fdx`, deletes them too.
+The installed app keeps it in `%APPDATA%\Obsidian Task Manager`; a run from source in `.local/desktop` inside the project folder. That is the chosen vault, your settings, and `task-backups` with a copy of each note before it was changed. The backups are never deleted automatically. When running from source, deleting the project folder, or running `git clean -fdx`, deletes them too.
 
 ## Optional: keep Obsidian Sync running without Obsidian
 
@@ -105,7 +100,7 @@ The status (up to date, syncing, disconnected, a problem and how to fix it) show
 
 ## Not supported yet
 
-Creating and deleting tasks, renaming a task, editing repeating tasks, reminders, time tracking, contexts and custom fields. An installer. macOS and Linux are untested.
+Creating and deleting tasks, renaming a task, editing repeating tasks, reminders, time tracking, contexts and custom fields. macOS and Linux are untested.
 
 ## Development
 
@@ -115,7 +110,11 @@ npm run desktop:smoke      # the app window, with real Electron, on a made-up va
 npm run desktop:pet-smoke  # the mini widget
 npm run desktop:sync-smoke # headless sync, against a fake `ob` (no account, no network)
 npm run docs:screenshots   # the pictures in docs/images
+npm run dist               # the installer, in release/
+npm run dist:smoke         # the packaged app from release/win-unpacked, before installing
 ```
+
+Pushing a tag like `v0.2.0` (the version in `package.json`) makes GitHub Actions build the installer and attach it to a draft release, which is published by hand.
 
 The smoke tests and the screenshots open real windows and take the keyboard focus, so leave the PC alone while they run. They use made-up notes in a temporary profile and never touch your vault. They are not run in CI.
 
