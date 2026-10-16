@@ -1,0 +1,14 @@
+import { build } from 'esbuild';
+import { copyFile, mkdir } from 'node:fs/promises';
+await mkdir('dist/desktop/renderer', { recursive: true });
+await build({ entryPoints: ['apps/desktop/main.ts'], outfile: 'dist/desktop/main.cjs', bundle: true, platform: 'node', format: 'cjs', target: 'node24', external: ['electron'], sourcemap: true });
+await build({ entryPoints: ['apps/desktop/pet-preload.ts'], outfile: 'dist/desktop/pet-preload.cjs', bundle: true, platform: 'node', format: 'cjs', external: ['electron'] });
+await build({ entryPoints: ['apps/desktop/renderer/pet.tsx'], outfile: 'dist/desktop/renderer/pet.js', bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, external: ['/PretendardVariable.woff2'], minify: true });
+await copyFile('apps/desktop/renderer/pet.html', 'dist/desktop/renderer/pet.html');
+await build({ entryPoints: ['apps/desktop/preload.ts'], outfile: 'dist/desktop/preload.cjs', bundle: true, platform: 'node', format: 'cjs', external: ['electron'] });
+await build({ entryPoints: ['apps/desktop/renderer/app.tsx'], outfile: 'dist/desktop/renderer/app.js', bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, external: ['/PretendardVariable.woff2'], minify: true, sourcemap: true });
+await build({ entryPoints: ['apps/desktop/renderer/theme.ts'], outfile: 'dist/desktop/renderer/theme.js', bundle: true, platform: 'browser', format: 'iife', minify: true });
+await copyFile('apps/desktop/renderer/index.html', 'dist/desktop/renderer/index.html');
+await copyFile('node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2', 'dist/desktop/renderer/PretendardVariable.woff2');
+await copyFile('node_modules/pretendard/dist/LICENSE.txt', 'dist/desktop/Pretendard-LICENSE.txt');
+console.log('Desktop app built in dist/desktop.');

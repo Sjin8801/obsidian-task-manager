@@ -1,0 +1,7 @@
+# Keep the repository canonical (LF) no matter what core.autocrlf a machine uses.
+* text=auto eol=lf
+# Windows PowerShell scripts stay CRLF.
+*.ps1 text eol=crlf
+# Never touch binary assets.
+*.png binary
+*.woff2 binary

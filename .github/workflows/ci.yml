@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to a pull request replaces that PR's older run. Pushes to main get one group per commit: in a shared group GitHub
+  # cancels the older *pending* run when merges arrive close together, which left the middle merge commit without a result.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Typecheck and tests
+    # The app targets Windows and the file watcher tests depend on Windows file events.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      # These checks never start Electron, so skip the ~100 MB binary download.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
