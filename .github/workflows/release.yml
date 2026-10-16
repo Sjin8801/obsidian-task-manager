@@ -1,0 +1,33 @@
+name: Release
+
+# Pushing a tag such as v0.2.0 (the version in package.json) builds the Windows installer and attaches it to a draft release.
+# The draft is published by hand on GitHub after a look at it.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    name: Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: The tag is the version in package.json
+        shell: bash
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - run: npm run check
+      - run: npm run dist
+      - name: Draft a release with the installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/Obsidian-Task-Manager-Setup-*.exe --draft --title "$GITHUB_REF_NAME" --generate-notes
