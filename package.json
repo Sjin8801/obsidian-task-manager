@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local Obsidian vault TaskNotes in a quick-access Electron desktop",
+  "main": "dist/desktop/main.cjs",
+  "description": "Today's TaskNotes tasks from a local Obsidian vault, in a popup and a desktop widget",
+  "author": "Sjin8801",
+  "homepage": "https://github.com/Sjin8801/obsidian-task-manager",
   "license": "MIT",
   "engines": {
     "node": ">=24"
@@ -17,22 +20,47 @@
     "desktop:pet-smoke": "npm run desktop:build && node --import tsx scripts/smoke-pet.ts",
     "desktop:sync-smoke": "npm run desktop:build && node --import tsx scripts/smoke-sync.ts",
     "desktop:smoke": "npm run desktop:build && node --import tsx scripts/smoke-desktop.ts",
-    "docs:screenshots": "npm run desktop:build && node --import tsx scripts/screenshots.ts"
-  },
-  "dependencies": {
-    "pretendard": "1.3.9",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "yaml": "2.9.1"
+    "docs:screenshots": "npm run desktop:build && node --import tsx scripts/screenshots.ts",
+    "dist": "npm run desktop:build && electron-builder --win --publish never",
+    "dist:smoke": "node --import tsx scripts/smoke-packaged.ts"
   },
   "devDependencies": {
     "@types/node": "24.13.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "electron": "44.3.0",
+    "electron-builder": "26.17.0",
     "esbuild": "0.28.2",
     "playwright-core": "1.63.0",
+    "pretendard": "1.3.9",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "tsx": "4.23.13",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "yaml": "2.9.1"
+  },
+  "build": {
+    "appId": "io.github.sjin8801.obsidian-task-manager",
+    "productName": "Obsidian Task Manager",
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "files": [
+      "dist/desktop/**/*",
+      "!**/*.map",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Obsidian Task Manager",
+      "artifactName": "Obsidian-Task-Manager-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

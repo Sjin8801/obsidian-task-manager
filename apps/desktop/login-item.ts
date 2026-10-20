@@ -13,7 +13,7 @@ export interface LoginExpectation { path: string; args: string[] }
 // arguments (the app cannot start from it). other: an entry with this name that points somewhere else; left alone.
 export type LoginItemState = 'off' | 'active' | 'legacy' | 'other';
 
-const same = (a: string, b: string) => path.win32.normalize(a).toLowerCase() === path.win32.normalize(b).toLowerCase();
+export const same = (a: string, b: string) => path.win32.normalize(a).toLowerCase() === path.win32.normalize(b).toLowerCase();
 const strip = (arg: string) => arg.replaceAll('"', '');
 const positional = (args: string[]) => args.map(strip).filter(arg => !arg.startsWith('--'));
 
