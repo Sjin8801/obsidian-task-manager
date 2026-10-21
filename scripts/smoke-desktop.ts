@@ -305,6 +305,17 @@ tags: [task, 업무]
   assert.deepEqual((await parentLine.locator('.sub-row .sub-title').allInnerTexts()), ['관계 하위 A', '관계 하위 B'], 'still to do first, then finished');
   assert.equal(await subRow('관계 하위 B').evaluate(el => getComputedStyle(el.querySelector('.sub-title')!).textDecorationLine), 'line-through', 'a finished subtask is struck through');
   await page.screenshot({ path: path.join(root, 'relations-list.png') });
+  // A subtask's status changes from its own right-click menu, the same one a row has, and its parent's count follows.
+  const subtaskCount = async (want: string) => { for (let i = 0; i < 60 && (await toggle.innerText()).replace(/\s+/g, '') !== want; i++) await delay(100); assert.equal((await toggle.innerText()).replace(/\s+/g, ''), want); };
+  const relationsMenu = page.getByRole('menu', { name: '상태 변경' });
+  await subRow('관계 하위 A').click({ button: 'right' }); await relationsMenu.waitFor();
+  assert.equal(await relationsMenu.getByRole('menuitemradio', { checked: true }).innerText().then(t => t.replace(/✓/g, '').trim()), '시작', 'the subtask has its own status checked');
+  await relationsMenu.getByRole('menuitemradio', { name: '완료', exact: true }).click(); await relationsMenu.waitFor({ state: 'detached' });
+  assert.match(await readFile(path.join(tasks, 'rel-child-a.md'), 'utf8'), /상태: 완료/);
+  await subtaskCount('2/2▸');
+  await subRow('관계 하위 A').click({ button: 'right' }); await relationsMenu.getByRole('menuitemradio', { name: '시작', exact: true }).click();
+  await relationsMenu.waitFor({ state: 'detached' }); await subtaskCount('1/2▸');
+  assert.doesNotMatch(await readFile(path.join(tasks, 'rel-child-a.md'), 'utf8'), /완료일/, 'reopening takes the completion date out, as for a row');
   // The choice is remembered, and the arrow keys do the same as the toggle.
   await page.reload(); await relRow('관계 상위 작업').waitFor();
   assert.equal(await parentLine.locator('.sub-toggle').getAttribute('aria-expanded'), 'true', 'an open parent stays open the next time');
@@ -326,6 +337,11 @@ tags: [task, 업무]
   const subtaskSection = page.getByRole('region', { name: '하위 작업' });
   assert.match(await subtaskSection.locator('.rel-title').innerText(), /1\/2 완료/);
   assert.equal(await subtaskSection.locator('.rel-link').count(), 2);
+  // On the detail screen too, a related task has the status menu.
+  await subtaskSection.locator('.rel-link', { hasText: '관계 하위 B' }).click({ button: 'right' }); await relationsMenu.waitFor();
+  assert.equal(await relationsMenu.getByRole('menuitemradio', { checked: true }).innerText().then(t => t.replace(/✓/g, '').trim()), '완료');
+  await page.getByRole('button', { name: '상태 메뉴 닫기' }).click(); await relationsMenu.waitFor({ state: 'detached' });
+  await page.getByRole('heading', { name: '관계 상위 작업' }).waitFor();
   assert.deepEqual((await page.getByRole('region', { name: '이 작업이 막고 있는 작업' }).locator('.rel-row').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').trim()), ['관계 막힌 작업 시작']);
   await subtaskSection.locator('.rel-link', { hasText: '관계 하위 B' }).click();
   await page.getByRole('heading', { name: '관계 하위 B' }).waitFor();

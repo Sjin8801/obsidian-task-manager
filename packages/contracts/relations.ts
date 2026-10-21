@@ -5,7 +5,9 @@ import type { TaskState } from './task.ts';
 export interface BlockedBy { uid: string; reltype: string; gap: string | null }
 
 /** A task as another task's relationships show it. `path` is the task's own path, the one used to open it. */
-export interface TaskRef { id: string; path: string; title: string; status: TaskState; rawStatus: string | null; scheduled: string | null; due: string | null }
+/** Another task, as a relation shows it. `revision` is the note as it was read, so its status can be changed from where it is shown (a change is
+ * refused if the note has changed since); `recurring` tasks are read-only. */
+export interface TaskRef { id: string; path: string; title: string; status: TaskState; rawStatus: string | null; scheduled: string | null; due: string | null; revision: string; recurring: boolean }
 
 /** A project or parent: any note a task's `projects` points at. `task` is set when that note is itself a task. */
 export interface ProjectRef { name: string; /** The link as written in the note, which is how an entry is taken out again. */ link: string; path: string | null; task: TaskRef | null; unresolved: 'not_found' | 'ambiguous' | 'path_traversal' | null }

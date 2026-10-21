@@ -38,9 +38,9 @@ export function readBlockedBy(value: unknown): BlockedBy[] {
 }
 
 /** What the relationship rules need to know about a task. `vaultPath` is where the note is in the vault; `path` is the task's own path. */
-export interface RelationTask { id: string; path: string; vaultPath: string; title: string; status: TaskState; rawStatus: string | null; scheduled: string | null; due: string | null; projects: string[]; blockedBy: BlockedBy[] }
+export interface RelationTask { id: string; path: string; vaultPath: string; title: string; status: TaskState; rawStatus: string | null; scheduled: string | null; due: string | null; revision: string; recurring: boolean; projects: string[]; blockedBy: BlockedBy[] }
 
-const ref = (task: RelationTask): TaskRef => ({ id: task.id, path: task.path, title: task.title, status: task.status, rawStatus: task.rawStatus, scheduled: task.scheduled, due: task.due });
+const ref = (task: RelationTask): TaskRef => ({ id: task.id, path: task.path, title: task.title, status: task.status, rawStatus: task.rawStatus, scheduled: task.scheduled, due: task.due, revision: task.revision, recurring: task.recurring });
 const byTitle = (a: TaskRef, b: TaskRef) => a.title.localeCompare(b.title, 'ko') || a.path.localeCompare(b.path, 'ko');
 // Subtasks still to do come first; the finished ones follow, each group by title.
 const openFirst = (a: TaskRef, b: TaskRef) => Number(a.status === 'done') - Number(b.status === 'done') || byTitle(a, b);

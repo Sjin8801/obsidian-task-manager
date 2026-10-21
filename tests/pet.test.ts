@@ -98,6 +98,14 @@ test('a status request must point at a task in the list that is still on screen'
   assert.equal(findPetTask(snapshot, { id: 'b', selectionKey: 'vault' })?.id, 'b');
   for (const bad of [undefined, null, 'a', 5, {}, { id: 'a' }, { selectionKey: 'vault' }, { id: 7, selectionKey: 'vault' }, { id: 'a', selectionKey: 'other-vault' }, { id: 'gone', selectionKey: 'vault' }]) assert.equal(findPetTask(snapshot, bad), null, JSON.stringify(bad));
 });
+test('a status request can point at a subtask shown under a row, which carries what the change needs', () => {
+  const sub = { id: 'child', path: 'child.md', title: 'Child', status: 'open' as const, rawStatus: '시작', scheduled: null, due: null, revision: 'r-child', recurring: false };
+  const snapshot = snapshotOf(listed({ subtasks: [sub], subtasksDone: 0 }));
+  const found = findPetTask(snapshot, { id: 'child', selectionKey: 'vault' });
+  assert.deepEqual(found && { path: found.path, revision: found.revision, recurring: found.recurring }, { path: 'child.md', revision: 'r-child', recurring: false });
+  assert.deepEqual(statusChoices(found!).filter(choice => choice.checked).map(choice => choice.status), ['open'], 'its own status is the checked one');
+  assert.equal(findPetTask(snapshot, { id: 'child', selectionKey: 'other-vault' }), null);
+});
 test('the status menu offers the same four statuses as the app and checks the current one', () => {
   assert.deepEqual(statusChoices(listed()).map(c => c.status), defaultStatuses.map(s => s.value));
   assert.deepEqual(statusChoices(listed({ rawStatus: 'in-progress' })).filter(c => c.checked).map(c => c.status), ['in-progress']);
