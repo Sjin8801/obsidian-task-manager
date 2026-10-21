@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeTheme, screen } from 'electron';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { compactSize, findPetTask, fitPeekHeight, isListed, leaveCheckMs, noticeSeconds, peekMaxHeight, peekSubtaskRoom, petBounds, petErrorText, raiseEveryMs, readPetPreferences, shouldRaise, statusChoices, undoStatus, type PetNotice, type PetPreferences, type PetSnapshot, type PetTask, type PetView } from './pet-model.ts';
+import { compactSize, findPetTask, fitPeekHeight, isListed, leaveCheckMs, noticeSeconds, peekMaxHeight, peekSubtaskRoom, petBounds, petErrorText, raiseEveryMs, readPetPreferences, shouldRaise, statusChoices, undoStatus, type PetNotice, type PetPreferences, type PetSnapshot, type PetStatusTarget, type PetView } from './pet-model.ts';
 import { defaultStatuses, findStatus } from '../../packages/contracts/statuses.ts';
 import type { Translate } from './i18n/index.ts';
 import { localizeStatuses } from './i18n/statuses.ts';
@@ -176,7 +176,7 @@ export class PetWindow {
       { label: t('위젯 숨기기'), click: () => { void this.hide(); } },
     ]).popup({ window: this.window });
   }
-  private statusMenu(task: PetTask) {
+  private statusMenu(task: PetStatusTarget) {
     const choose = (status: string) => { void this.applyStatus(task, status); };
     this.menuOpen = true;
     const t = this.t();
@@ -198,7 +198,7 @@ export class PetWindow {
     if (notice) this.noticeTimer = setTimeout(() => { this.notice = null; this.undoTarget = null; this.publish(); }, (notice.error ? noticeSeconds.error : noticeSeconds.undo) * 1000);
     this.publish();
   }
-  private async applyStatus(task: PetTask, status: string) {
+  private async applyStatus(task: PetStatusTarget, status: string) {
     const statuses = this.snapshot.statuses;
     if (task.recurring || status === findStatus(task.rawStatus, statuses)?.value) return;
     try {

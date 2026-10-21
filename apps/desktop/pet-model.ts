@@ -7,7 +7,7 @@ import type { TaskRef } from '../../packages/contracts/relations.ts';
 import { nestSubtasks } from '../../packages/tasknotes/relations.ts';
 // `category` is the same 업무/개인/added category the task list shows, from categoryOf().
 // `revision` is the note as the list last read it: changing the status is refused if the note has changed since.
-// `subtasks` are every task that points at this one as its project, still to do first; they open the task but cannot be changed from here.
+// `subtasks` are every task that points at this one as its project, still to do first; like a row, each opens its task and changes its status.
 export interface PetTask { id: string; path: string; revision: string; title: string; status: TaskRecord['status']; rawStatus: string | null; category: string; recurring: boolean; scheduled: string | null; due: string | null; subtasks: TaskRef[]; subtasksDone: number }
 // `statuses` is the list from the TaskNotes settings, which the status menu offers.
 export interface PetSnapshot { kind: 'ready' | 'disconnected' | 'unavailable' | 'loading'; total: number; tasks: PetTask[]; partial: boolean; selectionKey: string; statuses: StatusOption[] }
@@ -48,14 +48,16 @@ export function summarizePet(agenda: Agenda, selectionKey: string, categories: r
     tasks: nestSubtasks(tasks, agenda.relations).roots.map(task => ({ id: task.id, path: task.path, revision: task.revision, title: task.title, status: task.status, rawStatus: task.rawStatus, category: categoryOf(task, categories), recurring: task.recurring, scheduled: task.scheduled, due: task.due,
       subtasks: agenda.relations[task.id]?.subtasks ?? [], subtasksDone: agenda.relations[task.id]?.subtasksDone ?? 0 })) };
 }
-// Changing a task's status from the list (right-click on a row).
+// Changing a task's status from the list (right-click on a row or on a subtask under one).
 export interface PetTaskRef { id: string; selectionKey: string }
-/** The listed task a request points at, or null when the request is malformed or the list has moved on since it was drawn. */
-export function findPetTask(snapshot: PetSnapshot, request: unknown): PetTask | null {
+/** What the status menu needs of a row or a subtask. */
+export type PetStatusTarget = Pick<PetTask, 'id' | 'path' | 'revision' | 'title' | 'rawStatus' | 'recurring'>;
+/** The listed task or subtask a request points at, or null when the request is malformed or the list has moved on since it was drawn. */
+export function findPetTask(snapshot: PetSnapshot, request: unknown): PetStatusTarget | null {
   if (!request || typeof request !== 'object') return null;
   const { id, selectionKey } = request as Partial<PetTaskRef>;
   if (typeof id !== 'string' || typeof selectionKey !== 'string' || selectionKey !== snapshot.selectionKey) return null;
-  return snapshot.tasks.find(t => t.id === id) ?? null;
+  return snapshot.tasks.find(t => t.id === id) ?? snapshot.tasks.flatMap(t => t.subtasks).find(sub => sub.id === id) ?? null;
 }
 /** Whether the list on screen shows this task, either as a row or under one. Opening anything else is refused: the list has moved on. */
 export function isListed(snapshot: PetSnapshot, id: string): boolean {

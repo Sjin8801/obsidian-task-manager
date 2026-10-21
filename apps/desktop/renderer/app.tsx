@@ -8,7 +8,7 @@ import { isOverdue, localDate, taskDateParts, timeZone } from '../../../packages
 import { defaultStatuses, findStatus, statusName } from '../../../packages/contracts/statuses.ts';
 import type { TaskRef } from '../../../packages/contracts/relations.ts';
 import { statusDot } from './status-dot.tsx';
-import { RelationChips, RelationSections, SubtaskList, SubtaskToggle, type RelationEditing } from './relations.tsx';
+import { RelationChips, RelationSections, SubtaskList, SubtaskToggle, TaskMenu, type RelationEditing } from './relations.tsx';
 import { nestSubtasks } from '../../../packages/tasknotes/relations.ts';
 import { ShortcutSettings } from './shortcut-settings.tsx';
 import { SyncSettings } from './sync-settings.tsx';
@@ -124,6 +124,15 @@ function App() {
       if (!result.ok) { setError(explain(result.code)); return; }
       if (!result.value) { setSavedMessage(t('이 작업을 찾을 수 없어요. 목록을 새로고침해 주세요.')); return; }
       remember(result.value.task, result.value.relations); navigate({ type: 'open', screen: 'detail', task: result.value.task });
+    });
+  }
+  // A subtask or a related task gets the same status menu as a row. The menu needs the whole note as it is now, so it is read first.
+  function openRelatedMenu(ref: TaskRef, event: React.MouseEvent) {
+    const x = Math.min(event.clientX, window.innerWidth - 230), y = Math.min(event.clientY, window.innerHeight - 292);
+    void api?.getTask(ref.path).then(result => {
+      if (!result.ok) { setError(explain(result.code)); return; }
+      if (!result.value) { setSavedMessage(t('이 작업을 찾을 수 없어요. 목록을 새로고침해 주세요.')); return; }
+      remember(result.value.task, result.value.relations); setContext({ task: result.value.task, x, y });
     });
   }
   const [error, setError] = useState<string | null>(null), [stale, setStale] = useState(false), [loading, setLoading] = useState(false);
@@ -408,7 +417,7 @@ function App() {
   const fetchedAt = listing ? results?.fetchedAt : agenda?.fetchedAt;
   const vaultName = status?.vault?.vaultPath.split(/[\\/]/).filter(Boolean).at(-1) ?? t('볼트');
   const outdated = !!agenda && agenda.date !== day;
-  return <div className={'app ' + (connected && !settings && !selected && !editing ? 'browsing' : '')}>
+  return <TaskMenu.Provider value={editing || settings ? null : openRelatedMenu}><div className={'app ' + (connected && !settings && !selected && !editing ? 'browsing' : '')}>
     <div className="titlebar" inert={searching}><span className="brand-mark">✓</span><span>TaskNotes</span><span className="breadcrumb">/</span><span>{!connected ? t('볼트 선택') : settings ? t('볼트 설정') : editing ? t('작업 편집') : selected ? t('작업 상세') : scope === 'completed' ? t('완료 작업') : t('오늘 작업')}</span><span className="titlebar-spacer"/>{status && connected && syncNeedsAttention(status.sync) && <button className="sync-chip" onClick={() => { if (!settings) openSettings(); }}>{t('동기화 {state}', { state: status.sync.phase === 'stalled' ? t('지연') : t('문제') })}</button>}<button aria-label={t('창 숨기기')} onClick={() => void api?.hide()}>−</button></div>
     {!ready ? <div className="empty">{t('선택한 볼트를 확인하고 있어요.')}</div> : !connected ? <main className="connect">
       <span className="eyebrow">{t('내 볼트에서 바로')}</span><h1>{t('오늘의 작업을')}<br/>{t('더 가까이.')}</h1>
@@ -458,6 +467,6 @@ function App() {
       {actions && <><button className="actions-backdrop" aria-label={t('동작 메뉴 닫기')} onClick={() => setActions(false)}/><div className="actions-panel" role="dialog" aria-label={t('작업 동작')}><div className="section-label">{t('동작')}</div>{!settings && !selected && visibleTasks[activeIndex] && <button onClick={() => { openDetail(visibleTasks[activeIndex]!); setActions(false); }}>{t('작업 상세 보기')}{' '}<kbd>↵</kbd></button>}<button onClick={() => { refresh(); setActions(false); }}>{t('목록 새로고침')}{' '}<kbd>Ctrl R</kbd></button><button onClick={() => { navigate({ type: 'scope', scope: 'completed', clearQuery: true }); setActions(false); }}>{t('완료 작업 모아보기')}</button><button onClick={() => { openSettings(); setActions(false); }}>{t('볼트 설정')}</button><button onClick={() => { setActions(false); void api?.hide(); }}>{t('창 숨기기')}</button></div></>}
       <footer inert={searching}><span className={'connection-dot ' + (error ? 'offline' : '')}/><span>{fetchedAt ? `${stale ? t('마지막 조회') : t('갱신')} ${new Intl.DateTimeFormat(intl, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: timeZone() }).format(new Date(fetchedAt))}` : t('로컬 볼트')}</span><span className="footer-spacer"/><span role="status">{savedMessage}</span><span className="open-hint">{t('드래그 분류 · 우클릭 상태 · 더블클릭 수정')}</span><button disabled={busy} className="actions-toggle" onClick={() => setActions(value => !value)} aria-expanded={actions}>{t('동작')}{' '}<kbd>Ctrl K</kbd></button></footer>
     </>}
-  </div>;
+  </div></TaskMenu.Provider>;
 }
 createRoot(document.getElementById('root')!).render(<I18nProvider><App/></I18nProvider>);

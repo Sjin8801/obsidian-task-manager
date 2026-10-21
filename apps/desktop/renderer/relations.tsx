@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useId, useRef, useState } from 'react';
 import type { DependencyRef, ProjectRef, TaskRef, TaskRelations } from '../../../packages/contracts/relations.ts';
 import { statusName } from '../../../packages/contracts/statuses.ts';
 import type { RelationCandidate, RelationKind, RelationOther, StatusOption } from '../shared.ts';
@@ -35,9 +35,14 @@ export function RelationChips({ relations, hideSubtasks = false }: { relations: 
   </>;
 }
 
+/** What a right-click on another task does wherever it is shown (a subtask under its parent, a relation in a task's details): the same status
+ * menu as a row of the list. The app provides it. */
+export const TaskMenu = createContext<((task: TaskRef, event: React.MouseEvent) => void) | null>(null);
+const menuHandler = (menu: React.ContextType<typeof TaskMenu>, task: TaskRef) => menu ? (event: React.MouseEvent) => { event.preventDefault(); event.stopPropagation(); menu(task, event); } : undefined;
+
 function TaskLink({ task, statuses, onOpen }: { task: TaskRef; statuses: readonly StatusOption[]; onOpen: (task: TaskRef) => void }) {
-  const { t } = useI18n();
-  return <button type="button" className="rel-link" onClick={() => onOpen(task)}>{statusDot(task.rawStatus, statuses, t)}<span className="rel-text">{task.title}</span><span className="rel-note">{statusName(task.rawStatus, statuses) ?? ''}</span></button>;
+  const { t } = useI18n(), menu = useContext(TaskMenu);
+  return <button type="button" className="rel-link" onClick={() => onOpen(task)} onContextMenu={menuHandler(menu, task)}>{statusDot(task.rawStatus, statuses, t)}<span className="rel-text">{task.title}</span><span className="rel-note">{statusName(task.rawStatus, statuses) ?? ''}</span></button>;
 }
 
 function Project({ project, statuses, onOpen }: { project: ProjectRef; statuses: readonly StatusOption[]; onOpen: (task: TaskRef) => void }) {
@@ -151,10 +156,10 @@ export function SubtaskToggle({ relations, open, onToggle }: { relations: TaskRe
 
 /** The subtasks under a task. Each one slides in a moment after the one before; they close together, a little faster. */
 export function SubtaskList({ subtasks, statuses, open, today, onOpen }: { subtasks: readonly TaskRef[]; statuses: readonly StatusOption[]; open: boolean; today: string; onOpen: (task: TaskRef) => void }) {
-  const { t } = useI18n();
+  const { t } = useI18n(), menu = useContext(TaskMenu);
   return <div className={'sub-list' + (open ? ' open' : '')} style={{ '--n': subtasks.length } as React.CSSProperties} role="group" aria-label={t('하위 작업')}>
     {subtasks.map((task, index) => <div className="sub-item" style={{ '--i': index } as React.CSSProperties} key={task.id}><div className="sub-inner">
-      <button type="button" className={'sub-row' + (task.status === 'done' ? ' done' : '')} tabIndex={open ? 0 : -1} onClick={() => onOpen(task)}>
+      <button type="button" className={'sub-row' + (task.status === 'done' ? ' done' : '')} tabIndex={open ? 0 : -1} onClick={() => onOpen(task)} onContextMenu={menuHandler(menu, task)}>
         {statusDot(task.rawStatus, statuses, t)}<span className="sub-title">{task.title}</span>
         <span className="sub-meta">{statusName(task.rawStatus, statuses) ?? ''}{taskDateParts(task, today).map(part => <span key={part.kind} className={part.late ? 'late' : undefined}> · {part.kind === 'scheduled' ? t('예정') : t('마감')} {part.text}</span>)}</span>
       </button>
