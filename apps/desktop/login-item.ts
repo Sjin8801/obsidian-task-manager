@@ -26,6 +26,30 @@ export function loginItemState(items: LoginItem[] | undefined, expected: LoginEx
   return item.args.some(arg => arg.includes('"')) ? 'legacy' : 'active';
 }
 
+// Windows' rules for a command line: quotes group, and \" is a literal quote (which is how the old code's broken entry shows up).
+export function windowsArguments(command: string): string[] {
+  const args: string[] = [];
+  let current = '', quoted = false, started = false;
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i]!;
+    if (char === '\\' && command[i + 1] === '"') { current += '"'; i++; started = true; }
+    else if (char === '"') { quoted = !quoted; started = true; }
+    else if (/\s/.test(char) && !quoted) { if (started) args.push(current); current = ''; started = false; }
+    else { current += char; started = true; }
+  }
+  if (started) args.push(current);
+  return args;
+}
+
+// Electron's getLoginItemSettings lists nothing for an executable whose file name has a space ("Obsidian Task Manager.exe"), even right
+// after it wrote the entry itself, so the installed app could never see its own entry. The entry is read from the registry instead
+// (readStartupEntry in import-profile.ts) and shaped like the items Electron would have listed.
+export interface StartupEntryLike { command: string | null; enabled: boolean }
+export function loginItemsFromEntry(entry: StartupEntryLike): LoginItem[] {
+  const [path, ...args] = windowsArguments(entry.command ?? '');
+  return path ? [{ name: loginItemName, path, args, enabled: entry.enabled }] : [];
+}
+
 export interface LoginItemApi {
   get(): LoginItem[] | undefined;
   set(options: { path: string; args: string[]; name: string; openAtLogin: boolean; enabled: boolean }): void;

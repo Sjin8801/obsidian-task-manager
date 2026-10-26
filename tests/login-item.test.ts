@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loginItemName, loginItemState, repairLegacyLoginItem, type LoginItem, type LoginItemApi } from '../apps/desktop/login-item.ts';
+import { loginItemName, loginItemState, loginItemsFromEntry, repairLegacyLoginItem, windowsArguments, type LoginItem, type LoginItemApi } from '../apps/desktop/login-item.ts';
 
 const exe = 'C:\\app\\node_modules\\electron\\dist\\electron.exe';
 const main = 'C:\\app\\dist\\desktop\\main.cjs';
@@ -75,4 +75,23 @@ test('nothing else is ever rewritten, in particular not an entry the user switch
 test('a repair that does not take reports failure instead of claiming success', () => {
   const stuck: LoginItemApi = { get: () => [realLegacyEntry], set: () => {} };
   assert.equal(repairLegacyLoginItem(stuck, expected), false);
+});
+
+// Electron lists nothing for an executable with a space in its file name, so the installed app reads its entry from the registry.
+test('an entry read from the registry is judged like a listed one, also for an executable with a space in its name', () => {
+  const installed = { path: 'C:\Users\me\AppData\Local\Programs\obsidian-task-manager\Obsidian Task Manager.exe', args: ['--task-autostart', '--task-profile=C:\Users\me\AppData\Roaming\Obsidian Task Manager'] };
+  const command = `"${installed.path}" --task-autostart "--task-profile=C:\Users\me\AppData\Roaming\Obsidian Task Manager"`;
+  assert.deepEqual(windowsArguments(command), [installed.path, ...installed.args]);
+  assert.equal(loginItemState(loginItemsFromEntry({ command, enabled: true }), installed), 'active');
+  assert.equal(loginItemState(loginItemsFromEntry({ command, enabled: false }), installed), 'off', 'switched off in Windows');
+  assert.equal(loginItemState(loginItemsFromEntry({ command: null, enabled: true }), installed), 'off', 'nothing registered');
+  assert.equal(loginItemState(loginItemsFromEntry({ command: '', enabled: true }), installed), 'off');
+  assert.equal(loginItemState(loginItemsFromEntry({ command: command.replace('Local', 'Other'), enabled: true }), installed), 'other', 'another copy of the app');
+});
+
+test('the old code\'s escaped quotes still read as a broken entry from the registry, and a correct one as active', () => {
+  const legacy = `"${exe}" \\"${main}\\" --task-autostart \\"--task-profile=${profile}\\"`;
+  assert.equal(loginItemState(loginItemsFromEntry({ command: legacy, enabled: true }), expected), 'legacy');
+  const current = `"${exe}" "${main}" --task-autostart "--task-profile=${profile}"`;
+  assert.equal(loginItemState(loginItemsFromEntry({ command: current, enabled: true }), expected), 'active');
 });
