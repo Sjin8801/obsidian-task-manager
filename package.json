@@ -59,6 +59,8 @@
       "oneClick": true,
       "perMachine": false,
       "shortcutName": "Obsidian Task Manager",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
       "artifactName": "Obsidian-Task-Manager-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false
     }

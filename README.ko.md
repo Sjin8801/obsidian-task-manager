@@ -98,6 +98,8 @@ Obsidian 앱을 끄면 Obsidian Sync도 멈춥니다. **볼트 설정 → 옵시
 
 상태(최신 상태, 동기화 중, 연결 끊김, 문제와 해결 방법)는 설정 화면과 트레이 툴팁에 나오고, 문제가 생기면 Windows 알림으로도 알립니다. 앱은 양방향(`bidirectional`) 모드일 때만 클라이언트를 시작하므로 이 앱에서 고친 내용이 버려지지 않습니다. 클라이언트를 찾지 못하면 `TASK_HEADLESS_ENTRY`에 `cli.js` 경로를(필요하면 `TASK_HEADLESS_NODE`에 `node.exe` 경로를) 지정합니다. 상태는 0.0.14 버전의 출력 문구를 읽어 판단하므로 이후 버전에서는 표시가 틀릴 수 있습니다. 동기화 자체에는 영향이 없습니다.
 
+**"Node.js 버전이 맞지 않아요"**(최근 출력에 `NODE_MODULE_VERSION` 또는 `ERR_DLOPEN_FAILED`): 클라이언트의 sqlite 모듈은 `npm install -g obsidian-headless`를 실행한 Node.js에 맞춰 만들어지는데, 앱이 다른 Node.js로 실행한 경우입니다. Node.js를 여러 버전 쓰거나(앱은 `PATH`에서 가장 먼저 나오는 `node.exe`를 씁니다) 클라이언트를 설치한 뒤 Node.js를 올렸을 때 생깁니다. `TASK_HEADLESS_NODE`에 클라이언트를 설치할 때 쓴 `node.exe` 경로를 지정하거나, 지금 쓰는 Node.js로 `npm install -g obsidian-headless`를 다시 실행하세요.
+
 ## 아직 지원하지 않는 것
 
 작업 생성·삭제, 제목 변경, 반복 작업 수정, 알림, 시간 기록, 컨텍스트, 사용자 정의 필드. macOS와 Linux는 시험하지 않았습니다.
