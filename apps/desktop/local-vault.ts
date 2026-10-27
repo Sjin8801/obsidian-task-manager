@@ -82,7 +82,7 @@ export class LocalVault {
         const [snapshot, notes] = await Promise.all([new TaskRepository(root, { vault: true, statuses, fields, relations: relationFields, identification }).snapshot(), listVaultNotes(this.selection.vaultPath).catch(() => null)]);
         // Task paths are relative to the task folder, links are resolved from the vault root.
         const folder = this.selection.taskRelativePath.replaceAll('\\', '/').replace(/^\.\/?|\/$/g, '');
-        const tasks: RelationTask[] = snapshot.tasks.map(task => ({ id: task.id, path: task.path, vaultPath: folder ? `${folder}/${task.path}` : task.path, title: task.title, status: task.status, rawStatus: task.rawStatus, scheduled: task.scheduled, due: task.due, projects: task.projects, blockedBy: task.blockedBy }));
+        const tasks: RelationTask[] = snapshot.tasks.map(task => ({ id: task.id, path: task.path, vaultPath: folder ? `${folder}/${task.path}` : task.path, title: task.title, status: task.status, rawStatus: task.rawStatus, scheduled: task.scheduled, due: task.due, revision: task.revision, recurring: task.recurring, projects: task.projects, blockedBy: task.blockedBy }));
         const index = notes ? buildIndex(notes) : null;
         const relations = index ? buildRelations(tasks, index) : new Map<string, TaskRelations>();
         return { ...snapshot, statuses, relations, graph: index ? { tasks, index, relations, names: relationFields, recurring: new Set(snapshot.tasks.filter(task => task.recurring).map(task => task.id)) } : null };

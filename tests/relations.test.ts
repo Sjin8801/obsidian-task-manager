@@ -6,7 +6,7 @@ import type { TaskState } from '../packages/contracts/task.ts';
 
 // Tasks live in TaskNotes/Tasks; projects are ordinary notes in Projects/. Nothing here depends on those folder names.
 const task = (name: string, extra: Partial<RelationTask> & { state?: TaskState } = {}): RelationTask => ({
-  id: name, path: `${name}.md`, vaultPath: `TaskNotes/Tasks/${name}.md`, title: name, status: extra.state ?? 'open', rawStatus: null, scheduled: null, due: null, projects: [], blockedBy: [], ...extra,
+  id: name, path: `${name}.md`, vaultPath: `TaskNotes/Tasks/${name}.md`, title: name, status: extra.state ?? 'open', rawStatus: null, scheduled: null, due: null, revision: 'r-' + name, recurring: false, projects: [], blockedBy: [], ...extra,
 });
 const dep = (uid: string, reltype = 'FINISHTOSTART', gap: string | null = null) => ({ uid, reltype, gap });
 const notes = ['Projects/Alpha.md', 'Projects/Beta.md', 'Archive/Beta.md', 'Notes/Reference.md'];

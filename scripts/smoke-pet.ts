@@ -531,6 +531,20 @@ ConvertTo-Json -Compress -InputObject @{ r = $c.R; g = $c.G; b = $c.B; window = 
     await delay(1100); await pet.locator('.pet-sub').filter({ hasText: title }).click();
     await page.locator('.detail h2').filter({ hasText: title }).waitFor({ timeout: 4000 });
   }
+  // A subtask's status changes from its own right-click menu, the same one a row has (the save is the real one, as above).
+  // The real menu came back after the status steps above; capture it again for this one.
+  await desktop!.evaluate(({ Menu }) => { const g = globalThis as any; g.popups = []; Menu.prototype.popup = function (options) { g.popups.push({ menu: this, callback: options?.callback }); }; });
+  await pet.locator('.pet-button').hover(); await settledLayout(); await pet.locator('.pet-task').filter({ hasText: '테스트 작업 2' }).hover(); await treeRow.hover(); await treeOpen.waitFor({ timeout: 5000 });
+  await delay(1100); await pet.locator('.pet-sub').filter({ hasText: '위젯 하위 A' }).click({ button: 'right' });
+  const subtaskItems = await lastMenu();
+  assert.deepEqual(subtaskItems.filter((i: any) => i.type === 'radio').map((i: any) => i.label), ['없음', '시작', '진행 중', '완료'], 'a subtask gets the same menu as a row');
+  assert.deepEqual(subtaskItems.filter((i: any) => i.checked).map((i: any) => i.label), ['시작']);
+  await clickMenuItem('진행 중');
+  for (let i = 0; i < 40 && !/상태: 진행 중/.test(await noteText('tree-a.md')); i++) await delay(100);
+  assert.match(await noteText('tree-a.md'), /상태: 진행 중/, 'the subtask note is saved');
+  await closeMenu();
+  await desktop!.evaluate(({ Menu }) => { const g = globalThis as any; Menu.prototype.popup = g.originalPopup; });
+  await writeFile(path.join(tasks, 'tree-a.md'), child('위젯 하위 A', '시작'));
   // The same when the list is full and scrolls: the parent still stays under the pointer while its subtasks open, and they show in full. The case
   // that hid them: the parent is the first row under the title, and its subtasks open above it. In progress, the parent is listed near the top.
   for (let i = 0; i < 8; i++) await writeFile(path.join(tasks, `cap-${i}.md`), raw('채움 ' + i));
