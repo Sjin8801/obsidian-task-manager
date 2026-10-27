@@ -90,8 +90,16 @@ export class PetWindow {
     const area = screen.getDisplayMatching({ x: p.x, y: p.y, ...compactSize }).workArea;
     return petBounds(p, this.expanded, area, this.peekHeight);
   }
+  // Which sides of the button the list opens on. The page is told this while the window is still compact, where the button sits in the same
+  // place whichever side it is drawn on. Told only when the window had already grown, the button was laid out for the wrong side of the
+  // taller window for a moment (it flashed to the far end, then snapped back) whenever the widget is near the top or left edge.
+  private opening() {
+    const p = this.preferences, area = screen.getDisplayMatching({ x: p.x, y: p.y, ...compactSize }).workArea;
+    const { below, left } = petBounds(p, true, area, this.peekHeight);
+    return { below, left };
+  }
   private view(): PetView {
-    const { below, left } = this.layout();
+    const { below, left } = this.opening();
     this.shown = { below, left };
     return { snapshot: this.snapshot, expanded: this.expanded, below, left, settingsError: this.settingsError, notice: this.notice };
   }

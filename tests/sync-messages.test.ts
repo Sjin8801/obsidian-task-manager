@@ -5,7 +5,7 @@ import type { SyncPhase, SyncProblem, SyncStatus } from '../apps/desktop/shared.
 
 const base: SyncStatus = { enabled: true, phase: 'synced', problem: null, phaseSince: null, startedAt: null, lastSyncedAt: null, lastActivityAt: null, progress: null, restarts: 0, lastError: null, mode: 'bidirectional', recent: [] };
 const status = (patch: Partial<SyncStatus>): SyncStatus => ({ ...base, ...patch });
-const problems: SyncProblem[] = ['NO_VAULT', 'NOT_INSTALLED', 'NODE_MISSING', 'NOT_LOGGED_IN', 'NOT_CONFIGURED', 'BAD_MODE', 'ALREADY_RUNNING', 'REMOTE_MISSING', 'ENCRYPTION_KEY', 'CRASHED'];
+const problems: SyncProblem[] = ['NO_VAULT', 'NOT_INSTALLED', 'NODE_MISSING', 'NOT_LOGGED_IN', 'NOT_CONFIGURED', 'BAD_MODE', 'ALREADY_RUNNING', 'REMOTE_MISSING', 'ENCRYPTION_KEY', 'NODE_MISMATCH', 'CRASHED'];
 
 test('relative times round to the unit a person would say', () => {
   const now = 10_000_000_000;

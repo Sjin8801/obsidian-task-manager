@@ -11,7 +11,7 @@ export type Result<T> = { ok: true; value: T } | { ok: false; code: string };
 export interface VaultSelection { vaultPath: string; taskRelativePath: string }
 // Headless Sync: `ob sync --continuous` run and watched by the app. See headless-sync.ts.
 export type SyncPhase = 'off' | 'starting' | 'connecting' | 'syncing' | 'synced' | 'offline' | 'stalled' | 'problem';
-export type SyncProblem = 'NO_VAULT' | 'NOT_INSTALLED' | 'NODE_MISSING' | 'NOT_LOGGED_IN' | 'NOT_CONFIGURED' | 'BAD_MODE' | 'ALREADY_RUNNING' | 'REMOTE_MISSING' | 'ENCRYPTION_KEY' | 'CRASHED';
+export type SyncProblem = 'NO_VAULT' | 'NOT_INSTALLED' | 'NODE_MISSING' | 'NOT_LOGGED_IN' | 'NOT_CONFIGURED' | 'BAD_MODE' | 'ALREADY_RUNNING' | 'REMOTE_MISSING' | 'ENCRYPTION_KEY' | 'NODE_MISMATCH' | 'CRASHED';
 export interface SyncStatus {
   enabled: boolean; phase: SyncPhase; problem: SyncProblem | null;
   phaseSince: number | null; startedAt: number | null; lastSyncedAt: number | null; lastActivityAt: number | null;

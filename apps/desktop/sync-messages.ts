@@ -25,6 +25,7 @@ const problemText: Record<SyncProblem, { title: string; hint: string }> = {
   ALREADY_RUNNING: { title: N('이 볼트를 다른 곳에서 이미 동기화하고 있어요'), hint: N('열려 있는 터미널의 ob sync 를 닫고, 옵시디언 앱의 Sync 는 끈 뒤 다시 시도해 주세요.') },
   REMOTE_MISSING: { title: N('연결된 원격 볼트가 없어졌어요'), hint: N('ob sync-setup 을 다시 실행해 볼트를 연결해 주세요.') },
   ENCRYPTION_KEY: { title: N('암호화 키를 찾지 못했어요'), hint: N('ob sync-setup 을 다시 실행해 암호화 비밀번호를 입력해 주세요.') },
+  NODE_MISMATCH: { title: N('Node.js 버전이 맞지 않아요'), hint: N('obsidian-headless 는 다른 버전의 Node.js 로 설치돼 있어요. 설치할 때 쓴 node.exe 의 경로를 환경변수 TASK_HEADLESS_NODE 에 지정하거나, 지금 쓰는 Node.js 로 npm install -g obsidian-headless 를 다시 실행해 주세요.') },
   CRASHED: { title: N('동기화가 계속 멈춰요'), hint: N('아래 최근 출력을 확인하고 다시 시도해 주세요.') },
 };
 export const problemTitle = (problem: SyncProblem, t: Translate = korean) => t(problemText[problem].title);

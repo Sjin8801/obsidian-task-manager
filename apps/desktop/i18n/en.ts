@@ -327,6 +327,8 @@ export const en: Readonly<Record<string, string>> = {
   "ob sync-setup 을 다시 실행해 볼트를 연결해 주세요.": "Run ob sync-setup again to connect the vault.",
   "암호화 키를 찾지 못했어요": "The encryption key was not found",
   "ob sync-setup 을 다시 실행해 암호화 비밀번호를 입력해 주세요.": "Run ob sync-setup again and enter the encryption password.",
+  "Node.js 버전이 맞지 않아요": "The Node.js version does not match",
+  "obsidian-headless 는 다른 버전의 Node.js 로 설치돼 있어요. 설치할 때 쓴 node.exe 의 경로를 환경변수 TASK_HEADLESS_NODE 에 지정하거나, 지금 쓰는 Node.js 로 npm install -g obsidian-headless 를 다시 실행해 주세요.": "obsidian-headless was installed with a different version of Node.js. Set the environment variable TASK_HEADLESS_NODE to the node.exe it was installed with, or run npm install -g obsidian-headless again with the Node.js you use now.",
   "동기화가 계속 멈춰요": "Sync keeps stopping",
   "아래 최근 출력을 확인하고 다시 시도해 주세요.": "Check the recent output below and try again.",
   "꺼짐": "Off",

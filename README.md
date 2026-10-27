@@ -98,6 +98,8 @@ The app never handles your Obsidian account or encryption password. Set the clie
 
 The status (up to date, syncing, disconnected, a problem and how to fix it) shows in the settings, in the tray tooltip and, when there is a problem, as a Windows notification. The app only starts the client in two-way mode (`bidirectional`), so changes made here are never discarded. If the client cannot be found, set `TASK_HEADLESS_ENTRY` to the path of its `cli.js` (and `TASK_HEADLESS_NODE` to `node.exe` if needed). The status is read from the client's output as of version 0.0.14, so a later version could show it wrongly; syncing itself is not affected.
 
+**"The Node.js version does not match"** (`NODE_MODULE_VERSION` / `ERR_DLOPEN_FAILED` in the recent output): the client's native sqlite module is built for the Node.js that ran `npm install -g obsidian-headless`, and the app started it with another one. This happens when you have several Node.js versions (the app picks the first `node.exe` on `PATH`) or upgraded Node.js after installing the client. Either set `TASK_HEADLESS_NODE` to the `node.exe` the client was installed with, or run `npm install -g obsidian-headless` again with the Node.js you use now.
+
 ## Not supported yet
 
 Creating and deleting tasks, renaming a task, editing repeating tasks, reminders, time tracking, contexts and custom fields. macOS and Linux are untested.

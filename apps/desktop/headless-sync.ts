@@ -53,6 +53,8 @@ export function interpretLine(line: string): LineEvent {
   if (lower.includes('no sync configuration found') || (lower.includes('sync-setup') && lower.includes('first'))) return { kind: 'problem', problem: 'NOT_CONFIGURED' };
   if (lower.includes('remote vault no longer exists')) return { kind: 'problem', problem: 'REMOTE_MISSING' };
   if (lower.includes('encryption key')) return { kind: 'problem', problem: 'ENCRYPTION_KEY' };
+  // Its sqlite module was built for another Node.js than the one running it (e.g. after a Node upgrade, or with several versions on PATH).
+  if (lower.includes('node_module_version') || lower.includes('err_dlopen_failed')) return { kind: 'problem', problem: 'NODE_MISMATCH' };
   if (lower.includes('fully synced')) return { kind: 'synced' };
   if (lower.includes('waiting to connect') || lower.includes('disconnected')) return { kind: 'offline' };
   if (lower.includes('connecting')) return { kind: 'connecting' };
@@ -126,7 +128,7 @@ export interface SyncDeps {
   timings?: Partial<SyncTimings>;
 }
 
-const problemsNeedingYou: SyncProblem[] = ['NOT_LOGGED_IN', 'NOT_CONFIGURED', 'REMOTE_MISSING', 'ENCRYPTION_KEY'];
+const problemsNeedingYou: SyncProblem[] = ['NOT_LOGGED_IN', 'NOT_CONFIGURED', 'REMOTE_MISSING', 'ENCRYPTION_KEY', 'NODE_MISMATCH'];
 
 export class HeadlessSync {
   private readonly t: SyncTimings;

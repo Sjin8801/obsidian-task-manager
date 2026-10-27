@@ -73,6 +73,9 @@ test('interpretLine understands the phrases obsidian-headless prints', () => {
     ['The connected remote vault no longer exists.', { kind: 'problem', problem: 'REMOTE_MISSING' }],
     ['Encryption key not found. Run setup again.', { kind: 'problem', problem: 'ENCRYPTION_KEY' }],
     ['End-to-end encryption key missing. Run setup again.', { kind: 'problem', problem: 'ENCRYPTION_KEY' }],
+    ['was compiled against a different Node.js version using', { kind: 'info' }],
+    ['NODE_MODULE_VERSION 127. This version of Node.js requires', { kind: 'problem', problem: 'NODE_MISMATCH' }],
+    ["code: 'ERR_DLOPEN_FAILED'", { kind: 'problem', problem: 'NODE_MISMATCH' }],
     ['Sync error: Error: socket hang up', { kind: 'error', text: 'Sync error: Error: socket hang up' }],
     ['Scanning for changes...', { kind: 'info' }],
     ['', { kind: 'info' }],
@@ -177,7 +180,7 @@ test('a one-way sync mode is refused because it would undo edits made by this ap
 });
 
 test('problems the user must fix are reported once and are not retried in a loop', async () => {
-  for (const [line, problem] of [['No account logged in. Run "ob login" first.', 'NOT_LOGGED_IN'], ['The connected remote vault no longer exists.', 'REMOTE_MISSING'], ['Encryption key not found. Run setup again.', 'ENCRYPTION_KEY'], ["Run 'ob sync-setup' first.", 'NOT_CONFIGURED']] as const) {
+  for (const [line, problem] of [['No account logged in. Run "ob login" first.', 'NOT_LOGGED_IN'], ['The connected remote vault no longer exists.', 'REMOTE_MISSING'], ['Encryption key not found. Run setup again.', 'ENCRYPTION_KEY'], ["Run 'ob sync-setup' first.", 'NOT_CONFIGURED'], ["code: 'ERR_DLOPEN_FAILED'", 'NODE_MISMATCH']] as const) {
     const h = await started();
     h.children[0]!.say(line); h.children[0]!.exit(1);
     assert.deepEqual([h.sync.status().phase, h.sync.status().problem], ['problem', problem], line);
