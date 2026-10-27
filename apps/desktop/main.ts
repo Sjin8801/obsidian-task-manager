@@ -6,7 +6,7 @@ import path from 'node:path';
 import { HeadlessSync, locateHeadless, preflightSync, runCommand, spawnHeadless, type SyncTimings } from './headless-sync.ts';
 import { syncAlert, trayLabel } from './sync-messages.ts';
 import { SyncSettings } from './sync-store.ts';
-import { loginItemName, loginItemState, repairLegacyLoginItem } from './login-item.ts';
+import { loginItemName, loginItemState, loginItemsFromEntry } from './login-item.ts';
 import { importProfile, readStartupEntry, sourceProfileFrom, type RunProgram, type StartupEntry } from './import-profile.ts';
 import { LocalVault, selectVault, selectTaskFolder, validSelection, VaultError } from './local-vault.ts';
 import { ShortcutStore } from './shortcut-store.ts';
@@ -29,8 +29,16 @@ const profileArgument = process.argv.find(arg => arg.startsWith('--task-profile=
 if (profileArgument || !app.isPackaged) app.setPath('userData', path.resolve(profileArgument ?? process.env.TASK_DESKTOP_DATA ?? path.join(__dirname, '../../.local/desktop')));
 // No quotes of our own in the arguments: Electron quotes and escapes them, and a doubled quote breaks the launch at login (see login-item.ts).
 const loginOptions = { path: process.execPath, args: [...(app.isPackaged ? [] : [path.join(__dirname, 'main.cjs')]), '--task-autostart', `--task-profile=${app.getPath('userData')}`] };
-// openAtLogin is not usable here: Electron answers false whenever the arguments contain a switch. Read the registered entry instead.
-const autoStart = () => process.platform === 'win32' && loginItemState(app.getLoginItemSettings(loginOptions).launchItems, loginOptions) === 'active';
+// Neither openAtLogin (false whenever the arguments contain a switch) nor launchItems (empty when the executable's file name has a space) can
+// be trusted for the installed app, so the entry is read from the registry. That takes a PowerShell run, so the answer is kept
+// and read again at startup and after every change.
+const loginState = async () => loginItemState(loginItemsFromEntry(await readStartupEntry(runProgram)), loginOptions);
+let autoStartOn = false;
+const autoStart = () => autoStartOn;
+const refreshAutoStart = async () => {
+  if (process.platform !== 'win32') return;
+  try { autoStartOn = await loginState() === 'active'; } catch { /* Keeps what was read last. */ }
+};
 protocol.registerSchemesAsPrivileged([{ scheme: 'taskmanager', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 let win: BrowserWindow, tray: Tray, quitting = false, shortcutCapture = false, vault: LocalVault | null = null;
 let generation = 0, selectionBusy = false;
@@ -94,11 +102,15 @@ else {
     const categoryStore = new CategoryStore(profile('categories'));
     const loadVault = async (selection: VaultSelection) => new LocalVault(selection, await categoryStore.load(selection.vaultPath, language.locale));
     // An older version registered the login entry with quoted arguments, so the app could not start from it. Repair that once.
-    // Isolated profiles (tests) never touch this shared per-user entry.
-    if (process.platform === 'win32' && !process.env.TASK_DESKTOP_DATA) {
-      try { repairLegacyLoginItem({ get: () => app.getLoginItemSettings(loginOptions).launchItems, set: options => app.setLoginItemSettings(options) }, loginOptions); }
-      catch { /* The settings switch can still repair it. */ }
-    }
+    // Isolated profiles (tests) never touch this shared per-user entry. Started here and awaited before the window, so the
+    // PowerShell run overlaps with loading the vault.
+    const loginReady = (async () => {
+      if (process.platform !== 'win32') return;
+      try {
+        if (!process.env.TASK_DESKTOP_DATA && await loginState() === 'legacy') app.setLoginItemSettings({ ...loginOptions, name: loginItemName, openAtLogin: true, enabled: true });
+      } catch { /* The settings switch can still repair it. */ }
+      await refreshAutoStart();
+    })();
     const syncSettings = new SyncSettings(profile('sync.json'));
     await syncSettings.load();
     // Test hooks used only by scripts/smoke-sync.ts: short waits, and notifications written to a file instead of shown.
@@ -148,6 +160,7 @@ else {
     session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     session.defaultSession.setPermissionCheckHandler(() => false);
     session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !details.url.startsWith('taskmanager://app/') }));
+    await loginReady;
     win = new BrowserWindow({ width: 680, height: 620, minWidth: 440, minHeight: 500, show: false, frame: false,
       backgroundColor: '#202022', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, devTools: !app.isPackaged } });
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -173,9 +186,10 @@ else {
       if (typeof value !== 'boolean') throw new VaultError('INVALID_REQUEST');
       shortcutCapture = value && win.isFocused(); return null;
     });
-    handle('setAutoStart', value => {
+    handle('setAutoStart', async value => {
       if (typeof value !== 'boolean' || process.platform !== 'win32') throw new VaultError('INVALID_REQUEST');
       app.setLoginItemSettings({ ...loginOptions, name: loginItemName, openAtLogin: value, enabled: value });
+      await refreshAutoStart();
       if (autoStart() !== value) throw new VaultError('LOCAL_STORAGE_ERROR');
       return status();
     });
