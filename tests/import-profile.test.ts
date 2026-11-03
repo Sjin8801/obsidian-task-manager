@@ -29,16 +29,38 @@ test('the profile of a run from source is read from its start-at-login command',
   assert.equal(sourceProfileFrom(raw`"C:\otm\electron.exe" dist\desktop\main.cjs`, installedExe), null, 'a relative path says nothing');
 });
 
-test('the startup entry is read through PowerShell as UTF-8 JSON, and a switched-off entry is reported off', async () => {
-  const calls: string[][] = [];
-  const answer = (json: string) => async (file: string, args: string[]) => { calls.push([file, ...args]); return json; };
+// A `reg export` file as reg.exe writes it: UTF-16 with a byte order mark, CRLF, strings escaped, long binary wrapped with `,\`.
+const regFile = (key: string, values: string[]) => '\uFEFF' + ['Windows Registry Editor Version 5.00', '', `[${key}]`, ...values, '', ''].join('\r\n');
+const regString = (name: string, value: string) => `"${name}"="${value.replace(/[\\"]/g, '\\$&')}"`;
+const runKey = raw`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`;
+const approvedKey = raw`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`;
+
+test('the startup entry is read with reg export as UTF-16, and a switched-off entry is reported off', async () => {
   const command = fromSource(raw`C:\사용자\otm`);
-  assert.deepEqual(await readStartupEntry(answer(JSON.stringify({ command, enabled: true }))), { command, enabled: true });
-  assert.equal(calls[0]![0], 'powershell.exe');
-  assert.match(calls[0]!.at(-1)!, /OutputEncoding = \[Text\.Encoding\]::UTF8/);
-  assert.match(calls[0]!.at(-1)!, /'Obsidian Task Manager'/);
-  assert.deepEqual(await readStartupEntry(answer('{"command":null,"enabled":true}')), { command: null, enabled: true });
-  assert.deepEqual(await readStartupEntry(answer(JSON.stringify({ command, enabled: false }))), { command, enabled: false });
+  const calls: string[][] = [];
+  // Answers like reg.exe: writes the key's file, or fails when the key is missing (a PC where no startup entry was ever switched).
+  const reg = (run: string[], approved: string[] | null) => async (file: string, args: string[]) => {
+    calls.push([file, ...args]);
+    const content = args[1]!.endsWith('StartupApproved\\Run') ? approved && regFile(approvedKey, approved) : regFile(runKey, run);
+    if (content === null) throw new Error('ERROR: The system was unable to find the specified registry key or value.');
+    await writeFile(args[2]!, Buffer.from(content, 'utf16le'));
+    return 'The operation completed successfully.\r\n';
+  };
+  const other = regString('OneDrive', raw`"C:\Program Files\Microsoft OneDrive\OneDrive.exe" /background`);
+  assert.deepEqual(await readStartupEntry(reg([other, regString('Obsidian Task Manager', command)], [])), { command, enabled: true });
+  assert.deepEqual(calls.map(call => call.slice(0, 3)), [['reg.exe', 'export', raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`],
+    ['reg.exe', 'export', raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`]]);
+  assert.ok(calls.every(call => call.at(-1) === '/y'), 'overwrites without asking');
+  assert.equal(calls.some(call => call[0]!.toLowerCase().includes('powershell')), false);
+  assert.deepEqual(await readStartupEntry(reg([other], [])), { command: null, enabled: true }, 'no entry');
+  assert.deepEqual(await readStartupEntry(reg([regString('Obsidian Task Manager', command)], null)), { command, enabled: true }, 'no StartupApproved key');
+  const off = ['"Obsidian Task Manager"=hex:03,00,00,00,ad,1f,9c,62,e9,4b,db,01'];
+  const wrappedOff = ['"Obsidian Task Manager"=hex:03,00,00,00,ad,1f,9c,62,\\', '  e9,4b,db,01'];
+  const on = ['"Obsidian Task Manager"=hex:02,00,00,00,00,00,00,00,00,00,00,00'];
+  assert.deepEqual(await readStartupEntry(reg([regString('Obsidian Task Manager', command)], off)), { command, enabled: false });
+  assert.deepEqual(await readStartupEntry(reg([regString('Obsidian Task Manager', command)], wrappedOff)), { command, enabled: false }, 'wrapped binary');
+  assert.deepEqual(await readStartupEntry(reg([regString('Obsidian Task Manager', command)], on)), { command, enabled: true });
+  await assert.rejects(readStartupEntry(async () => { throw new Error('reg.exe missing'); }), /reg\.exe missing/, 'a failed Run read is not taken for "off"');
 });
 
 async function profiles(t: { after: (fn: () => Promise<void>) => void }) {
