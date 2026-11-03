@@ -30,7 +30,7 @@ if (profileArgument || !app.isPackaged) app.setPath('userData', path.resolve(pro
 // No quotes of our own in the arguments: Electron quotes and escapes them, and a doubled quote breaks the launch at login (see login-item.ts).
 const loginOptions = { path: process.execPath, args: [...(app.isPackaged ? [] : [path.join(__dirname, 'main.cjs')]), '--task-autostart', `--task-profile=${app.getPath('userData')}`] };
 // Neither openAtLogin (false whenever the arguments contain a switch) nor launchItems (empty when the executable's file name has a space) can
-// be trusted for the installed app, so the entry is read from the registry. That takes a PowerShell run, so the answer is kept
+// be trusted for the installed app, so the entry is read from the registry. That takes `reg export` runs, so the answer is kept
 // and read again at startup and after every change.
 const loginState = async () => loginItemState(loginItemsFromEntry(await readStartupEntry(runProgram)), loginOptions);
 let autoStartOn = false;
@@ -103,7 +103,7 @@ else {
     const loadVault = async (selection: VaultSelection) => new LocalVault(selection, await categoryStore.load(selection.vaultPath, language.locale));
     // An older version registered the login entry with quoted arguments, so the app could not start from it. Repair that once.
     // Isolated profiles (tests) never touch this shared per-user entry. Started here and awaited before the window, so the
-    // PowerShell run overlaps with loading the vault.
+    // registry read overlaps with loading the vault.
     const loginReady = (async () => {
       if (process.platform !== 'win32') return;
       try {

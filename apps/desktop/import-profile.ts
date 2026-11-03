@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { cp, rename, rm, stat } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rename, rm, stat } from 'node:fs/promises';
+import os from 'node:os';
 import { loginItemName, same } from './login-item.ts';
 
 // The installed app keeps its settings in %APPDATA%; a run from source keeps them in <project>/.local/desktop. When someone moves from
@@ -44,21 +45,37 @@ export interface StartupEntry { command: string | null; enabled: boolean }
 /** Runs a program and gives back what it printed. */
 export type RunProgram = (file: string, args: string[]) => Promise<string>;
 /**
+ * One value of a `reg export` file: a REG_SZ as its text, a REG_BINARY as its bytes, null when the value is missing or of another type.
+ * Strings escape \ and " with a backslash; binary is `hex:xx,xx,...`, wrapped onto more lines with a trailing `,\`.
+ */
+export function regFileValue(file: string, name: string): string | number[] | null {
+  const prefix = `"${name.replace(/[\\"]/g, '\\$&')}"=`;
+  const line = file.replace(/,\\\r?\n\s*/g, ',').split(/\r?\n/).find(candidate => candidate.startsWith(prefix));
+  const value = line?.slice(prefix.length) ?? '';
+  const text = /^"((?:[^"\\]|\\.)*)"$/.exec(value);
+  if (text) return text[1]!.replace(/\\(.)/g, '$1');
+  const binary = /^hex:([0-9a-f]{2}(?:,[0-9a-f]{2})*)?$/i.exec(value);
+  return binary ? (binary[1]?.split(',') ?? []).map(byte => parseInt(byte, 16)) : null;
+}
+
+/**
  * This app's start-at-login entry as Windows holds it: the command in HKCU\...\Run, and whether it is switched on (switching it off in
- * Windows settings or Task Manager is kept in StartupApproved\Run, whose first byte is 3 when off). PowerShell prints it as UTF-8 so a
- * path with Korean or other letters arrives intact.
+ * Windows settings or Task Manager is kept in StartupApproved\Run, whose first byte is 3 when off). The keys are read with
+ * `reg export`, whose file is always UTF-16, so a path with Korean or other letters arrives intact; `reg query` prints in the console's
+ * code page, and PowerShell with -ExecutionPolicy Bypass is what antivirus software flags. A missing StartupApproved\Run means on.
  */
 export async function readStartupEntry(run: RunProgram): Promise<StartupEntry> {
-  const key = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion';
-  const script = [
-    '[Console]::OutputEncoding = [Text.Encoding]::UTF8',
-    `$command = (Get-ItemProperty -LiteralPath '${key}\\Run' -Name '${loginItemName}' -ErrorAction SilentlyContinue).'${loginItemName}'`,
-    `$approved = (Get-ItemProperty -LiteralPath '${key}\\Explorer\\StartupApproved\\Run' -Name '${loginItemName}' -ErrorAction SilentlyContinue).'${loginItemName}'`,
-    '@{ command = $command; enabled = -not ($approved -and $approved[0] -eq 3) } | ConvertTo-Json -Compress',
-  ].join('; ');
-  const parsed: unknown = JSON.parse(await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script]));
-  const value = parsed && typeof parsed === 'object' ? parsed as { command?: unknown; enabled?: unknown } : {};
-  return { command: typeof value.command === 'string' ? value.command : null, enabled: value.enabled !== false };
+  const key = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion', dir = await mkdtemp(path.join(os.tmpdir(), 'task-startup-'));
+  const exported = async (subkey: string, name: string) => {
+    const file = path.join(dir, name);
+    await run('reg.exe', ['export', `${key}\\${subkey}`, file, '/y']);
+    return (await readFile(file)).toString('utf16le');
+  };
+  try {
+    const command = regFileValue(await exported('Run', 'run.reg'), loginItemName);
+    const approved = regFileValue(await exported('Explorer\\StartupApproved\\Run', 'approved.reg').catch(() => ''), loginItemName);
+    return { command: typeof command === 'string' ? command : null, enabled: !(Array.isArray(approved) && approved[0] === 3) };
+  } finally { await rm(dir, { recursive: true, force: true }).catch(() => {}); }
 }
 
 const exists = (file: string) => stat(file).then(() => true, () => false);
