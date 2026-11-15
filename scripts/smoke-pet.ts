@@ -152,8 +152,11 @@ public static class Spot {
   [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint flags);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
 }
 "@
+# The point is in real screen pixels. On a screen scaled above 100% Windows would otherwise read it as scaled units and look somewhere else.
+[void][Spot]::SetProcessDPIAware()
 $b = [System.Drawing.Bitmap]::new(1, 1); $g = [System.Drawing.Graphics]::FromImage($b)
 try { $g.CopyFromScreen(${x}, ${y}, 0, 0, $b.Size) } catch { 'unavailable'; exit }
 $c = $b.GetPixel(0, 0); if ($c.A -eq 0) { 'unavailable'; exit }
@@ -195,12 +198,27 @@ ConvertTo-Json -Compress -InputObject @{ r = $c.R; g = $c.G; b = $c.B; window = 
     assert(await widgetBack(8), 'the widget comes back above a window that took the top');
     await uncoverWidget();
   }
-  // Opening the widget menu above hovered the button, which opened the list. Close it again before the compact size is read.
+  // Opening the widget menu above hovered the button, which opened the list. Close it again before the closed widget is looked at.
   await pet.evaluate(() => window.taskPet!.expand(false));
-  for (let i = 0; i < 40 && (await petWindowHeight()) !== 56; i++) await delay(50);
-  const compact = await desktop!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('/pet.html'))!.getBounds());
+  await pet.locator('.peek').waitFor({ state: 'detached', timeout: 2000 });
+  const petBoundsNow = () => desktop!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('/pet.html'))!.getBounds());
+  // The window has the open list's size while the list is closed (so opening it does not move the window: the button used to blink then),
+  // and the closed list is laid out but not shown. Wait until the window has settled on the size of the list that was read.
+  let closedBounds = await petBoundsNow();
+  for (let i = 0; i < 40; i++) { await delay(100); const next = await petBoundsNow(); if (next.height === closedBounds.height && next.height !== peekMaxHeight + peekChrome) break; closedBounds = next; }
+  closedBounds = await petBoundsNow();
+  assert(closedBounds.height > 56 + 60 && closedBounds.width === 308, `closed, the window already has the list's size (${JSON.stringify(closedBounds)})`);
+  assert.equal(await pet.locator('.peek-idle').count(), 1, 'the closed list is still laid out');
+  assert.equal(await pet.locator('.peek-idle').isVisible(), false, 'but not shown');
+  assert.equal(await pet.locator('.peek-idle .pet-task').first().isVisible(), false, 'and neither are its rows');
+  assert.equal(await pet.evaluate(() => { const r = document.querySelector('.peek-idle')!.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.classList.contains('pet-window'); }), true, 'the pointer goes through the closed list');
+  // Where the widget is, as its position is saved: the corner of the button's own 176x56 box (the button sits 8px inside it).
+  const closedButton = (await pet.locator('.pet-button').boundingBox())!;
+  const compact = { x: Math.round(closedBounds.x + closedButton.x - 8), y: Math.round(closedBounds.y + closedButton.y - 8) };
   await pet.screenshot({ path: path.join(root, 'pet-compact-dark.png') });
   await pet.locator('.pet-button').hover(); await pet.getByRole('region', { name: '오늘 할 일 미리보기' }).waitFor();
+  // Opening the list leaves the window exactly where it was.
+  assert.deepEqual(await petBoundsNow(), closedBounds, 'the window does not move or resize when the list opens');
   assert.equal(await pet.locator('.pet-task').count(), 4);
   assert((await pet.locator('.pet-task').first().innerText()).includes('테스트 작업 2'));
   // Each row says when the task is scheduled (these notes have a scheduled date of today and no due date).

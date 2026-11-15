@@ -97,24 +97,32 @@ function Pet() {
   };
   // Tell the main process how tall the list can get so the window fits a short list. The panel resizes every frame while subtasks slide,
   // but this height does not change then; it moves only by sub-pixel rounding, which the 2px threshold ignores.
-  const expanded = !!view?.expanded;
+  // The list is laid out (unseen) while it is closed as well, so the window already has its size when it opens and need not grow then.
+  const expanded = !!view?.expanded, mounted = !!view;
+  // Nothing has been read yet while loading: that list's height is not the one to size the window by.
+  const loading = useRef(true); loading.current = !view || view.snapshot.kind === 'loading';
+  const listOpen = useRef(false); listOpen.current = expanded;
   const report = useRef<() => void>(() => {});
   useEffect(() => {
     const el = peek.current;
-    if (!expanded || !el) { report.current = () => {}; return; }
+    if (!el) { report.current = () => {}; return; }
     let sent = -1;
     report.current = () => {
+      if (loading.current) return;
       const { list, tallest } = measure(el), height = Math.min(list, peekMaxHeight) + Math.min(tallest, peekSubtaskRoom);
-      if (Math.abs(height - sent) >= 2) { sent = height; run(api.fit(Math.ceil(height))); }
+      // Closed, nothing slides, so the height is sent to the pixel: what the 2px threshold left out while the list was open is made up for
+      // then, and the window is exactly right before the list opens again.
+      if (listOpen.current ? Math.abs(height - sent) >= 2 : Math.ceil(height) !== Math.ceil(sent)) { sent = height; run(api.fit(Math.ceil(height))); }
     };
     report.current();
     const observer = new ResizeObserver(() => report.current());
     observer.observe(el);
     return () => observer.disconnect();
-  }, [expanded]);
+  }, [mounted]);
   // A closed set of subtasks takes no room, so one that gains a subtask does not resize the panel; measure again whenever the list changes.
   useEffect(() => { report.current(); }, [view]);
-  useEffect(() => { if (!expanded) { setRoll(null); setRevealed(null); } }, [expanded]);
+  // The closed list stays in the page, so it is put back the way a newly opened one starts: nothing open, at the top.
+  useEffect(() => { if (!expanded) { setRoll(null); setRevealed(null); if (revealTimer.current) clearTimeout(revealTimer.current); if (peek.current) peek.current.scrollTop = 0; } }, [expanded]);
   useEffect(() => {
     // The row that was opened or closed stays where it is on screen. Normally the layout already sees to that (the list grows on the side
     // the window grows, and its height cap grows with the subtasks); when the subtasks are taller than peekSubtaskRoom the panel scrolls
@@ -147,7 +155,8 @@ function Pet() {
   return <main className={`pet-window ${view?.expanded ? 'expanded' : ''} ${view?.below ? 'below' : 'above'} ${view?.left ? 'left' : 'right'}`}
     onMouseMove={e => hover(e.target !== e.currentTarget)} onMouseLeave={() => hover(false)} onContextMenu={e => { e.preventDefault(); keep(); run(api.menu()); }}
     onKeyDown={e => { if (e.key === 'Escape') { run(api.expand(false)); (document.activeElement as HTMLElement)?.blur(); } }}>
-    {view?.expanded && <section className="peek" ref={peek} aria-label={t('오늘 할 일 미리보기')}>
+    {/* Closed, the list is still laid out but not shown and not reachable (.peek-idle in pet.css), so its height is known before it opens. */}
+    {view && <section className={view.expanded ? 'peek' : 'peek-idle'} inert={!view.expanded} ref={peek} aria-label={t('오늘 할 일 미리보기')}>
       <div className="peek-heading"><h1>{label}</h1><button aria-label={t('목록 접기')} onClick={() => run(api.expand(false))}>−</button></div>
       {view.notice && <div className={'pet-notice' + (view.notice.error ? ' error' : '')} role={view.notice.error ? 'alert' : 'status'}><span>{view.notice.text}</span>{view.notice.undo && <button onClick={() => run(api.undo())}>{t('되돌리기')}</button>}</div>}
       {snapshot?.kind === 'ready' && snapshot.tasks.map(task => <div className={'pet-group' + (revealed === task.id ? ' open' : '')} key={task.id} data-task={task.id} onMouseEnter={() => task.subtasks.length ? reveal(task.id, revealDelay.open) : reveal(null, revealDelay.close)} onMouseLeave={() => reveal(null, revealDelay.close)} onFocus={() => reveal(task.subtasks.length ? task.id : null, 0)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) reveal(null, revealDelay.close); }}>
