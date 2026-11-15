@@ -58,7 +58,7 @@ export class PetWindow {
       const next = fitPeekHeight(value, peekMaxHeight + peekSubtaskRoom);
       if (next === this.peekHeight) return;
       this.peekHeight = next;
-      if (this.expanded) this.fitBounds();
+      this.fitBounds();
     });
     handle('passThrough', value => { if (typeof value !== 'boolean') throw new Error('INVALID_REQUEST'); this.setPassThrough(value); });
     handle('open', value => {
@@ -87,10 +87,15 @@ export class PetWindow {
     if (!preferences.hidden) pet.window.showInactive();
     pet.refresh(); return pet;
   }
+  // The window is as large as the open list whether the list is open or not, so opening the list does not move or resize it. It used to grow
+  // when the list opened, and the button blinked: Windows draws the old frame (the button alone) at the new window's top-left corner until
+  // the page has drawn a frame of the new size, so for a frame the button was gone from its place and shown where the list's corner would be.
+  // The part of the window with nothing drawn in it lets clicks through (see setPassThrough). With "마우스를 올리면 목록 펼치기" off the
+  // list never opens, and the window is only as large as the button.
   private layout() {
     const p = this.preferences;
     const area = screen.getDisplayMatching({ x: p.x, y: p.y, ...compactSize }).workArea;
-    return petBounds(p, this.expanded, area, this.peekHeight);
+    return petBounds(p, p.peek, area, this.peekHeight);
   }
   // Which sides of the button the list opens on. The page is told this while the window is still compact, where the button sits in the same
   // place whichever side it is drawn on. Told only when the window had already grown, the button was laid out for the wrong side of the
@@ -113,17 +118,17 @@ export class PetWindow {
     const { x, y, width, height } = this.layout();
     this.window.setBounds({ x, y, width, height }); this.publish();
   }
-  // The list got longer or shorter (the page reports the height with its longest subtasks open, which does not change while they slide):
-  // move the window, and tell the page only when the button has gone to the other side of the list (its edges, not its height, are what the
-  // page lays out by).
+  // The list got longer or shorter (the page reports the height with its longest subtasks open, which does not change while they slide;
+  // it measures the list while it is closed too): move the window, and tell the page only when the button has gone to the other side of
+  // the list (its edges, not its height, are what the page lays out by).
   private fitBounds() {
     if (this.closed) return;
     const { x, y, width, height, below, left } = this.layout();
     this.window.setBounds({ x, y, width, height });
     if (below !== this.shown.below || left !== this.shown.left) this.publish();
   }
-  // The window is taller than the list whenever the list has room for subtasks that are not open, and it has a margin around the button.
-  // Those parts are see-through, and a click there must reach the window behind. `forward` keeps the pointer moves coming to the page, so
+  // The window is larger than what is drawn in it: the list's place is empty while the list is closed, the list has room for subtasks that
+  // are not open, and there is a margin around the button. Those parts are see-through, and a click there must reach the window behind. `forward` keeps the pointer moves coming to the page, so
   // it can say when the pointer is back over the list or the button.
   private setPassThrough(value: boolean) {
     if (this.passing === value || this.closed || this.window.isDestroyed()) return;
@@ -159,7 +164,8 @@ export class PetWindow {
     if (!value && this.menuOpen && !force) return;
     const next = value && this.preferences.peek && !this.dragging;
     if (this.expanded === next) return;
-    this.expanded = next; this.applyBounds(); this.watchLeave();
+    // The window already has the list's size (see layout), so only the page changes.
+    this.expanded = next; this.publish(); this.watchLeave();
     if (next) this.raise();
   }
   private persist() {
@@ -190,7 +196,7 @@ export class PetWindow {
     Menu.buildFromTemplate([
       { label: t('오늘 작업 열기'), click: () => { void this.openMain(); } },
       { type: 'separator' },
-      { label: t('마우스를 올리면 목록 펼치기'), type: 'checkbox', checked: this.preferences.peek, click: item => { this.preferences.peek = item.checked; this.setExpanded(false); void this.persist(); } },
+      { label: t('마우스를 올리면 목록 펼치기'), type: 'checkbox', checked: this.preferences.peek, click: item => { this.preferences.peek = item.checked; this.setExpanded(false); this.applyBounds(); void this.persist(); } },
       { label: t('항상 위에 표시'), type: 'checkbox', checked: this.preferences.alwaysOnTop, click: item => { this.preferences.alwaysOnTop = item.checked; this.window.setAlwaysOnTop(item.checked); void this.persist(); } },
       { label: t('위젯 숨기기'), click: () => { void this.hide(); } },
     ]).popup({ window: this.window });
