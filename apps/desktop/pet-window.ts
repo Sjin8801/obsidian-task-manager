@@ -29,6 +29,8 @@ export class PetWindow {
   private dragging: { x: number; y: number; startX: number; startY: number } | null = null;
   // While the status menu is open the pointer is over the menu, not the list. The list must stay so the choice has a target.
   private menuOpen = false;
+  // What the page last asked for. A close asked for while the status menu is open is not done then; it is done when the menu closes.
+  private wanted = false;
   private notice: PetNotice | null = null;
   private noticeTimer: ReturnType<typeof setTimeout> | undefined;
   // The last task finished from this list, kept so it can be put back while the notice is shown.
@@ -50,7 +52,7 @@ export class PetWindow {
       return fn(value);
     });
     handle('state', () => this.view());
-    handle('expand', value => { if (typeof value !== 'boolean') throw new Error('INVALID_REQUEST'); this.setExpanded(value); });
+    handle('expand', value => { if (typeof value !== 'boolean') throw new Error('INVALID_REQUEST'); this.wanted = value; this.setExpanded(value); });
     handle('fit', value => {
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 10000) throw new Error('INVALID_REQUEST');
       const next = fitPeekHeight(value, peekMaxHeight + peekSubtaskRoom);
@@ -126,19 +128,28 @@ export class PetWindow {
   private setPassThrough(value: boolean) {
     if (this.passing === value || this.closed || this.window.isDestroyed()) return;
     this.passing = value; this.window.setIgnoreMouseEvents(value, { forward: true });
-    this.watchLeave(!value);
+    this.watchLeave();
   }
   // Once click-through is switched off, Chromium does not hear about the pointer leaving the window (it started tracking the pointer through
   // the forwarded moves, and that tracking is not set up again), so the list stayed open after the pointer had gone. While the widget takes the
   // pointer, look where the real pointer is and tell the page when it is outside the window; the page then closes the list as on any leave.
-  private watchLeave(on: boolean) {
+  // The list is watched the same way while it is open, whatever opened it. The page only asks to close it when the pointer leaves after
+  // having been over the widget, so a list opened another way (the button getting the focus) stayed open with the pointer nowhere near.
+  // A window that has the focus is being used from the keyboard, and keeps its list.
+  private watchLeave() {
+    const on = !this.passing || this.expanded;
+    if (on === !!this.leaveTimer) return;
     clearInterval(this.leaveTimer); this.leaveTimer = undefined;
     if (!on) return;
     this.leaveTimer = setInterval(() => {
-      if (this.closed || this.window.isDestroyed() || !this.window.isVisible() || this.dragging) return;
-      const cursor = screen.getCursorScreenPoint(), b = this.window.getBounds();
-      if (cursor.x < b.x || cursor.y < b.y || cursor.x >= b.x + b.width || cursor.y >= b.y + b.height) this.window.webContents.send('pet:pointerLeft');
+      if (this.closed || this.window.isDestroyed() || !this.window.isVisible() || this.dragging || !this.pointerOutside()) return;
+      this.window.webContents.send('pet:pointerLeft');
+      if (this.expanded && !this.window.isFocused()) this.setExpanded(false);
     }, leaveCheckMs);
+  }
+  private pointerOutside() {
+    const cursor = screen.getCursorScreenPoint(), b = this.window.getBounds();
+    return cursor.x < b.x || cursor.y < b.y || cursor.x >= b.x + b.width || cursor.y >= b.y + b.height;
   }
   private raise() {
     if (this.closed || this.window.isDestroyed()) return;
@@ -148,7 +159,7 @@ export class PetWindow {
     if (!value && this.menuOpen && !force) return;
     const next = value && this.preferences.peek && !this.dragging;
     if (this.expanded === next) return;
-    this.expanded = next; this.applyBounds();
+    this.expanded = next; this.applyBounds(); this.watchLeave();
     if (next) this.raise();
   }
   private persist() {
@@ -195,10 +206,11 @@ export class PetWindow {
       { label: t('앱에서 열기'), click: () => { this.setExpanded(false, true); void this.openMain({ id: task.id, selectionKey: this.snapshot.selectionKey }); } },
     ]).popup({ window: this.window, callback: () => {
       this.menuOpen = false;
-      // The pointer may have gone elsewhere while the menu was open. If so the list closes now, as it would have without the menu.
+      // The pointer may have gone elsewhere while the menu was open. If so the list closes now, as it would have without the menu. The page
+      // may already have asked for that and been refused; it does not ask twice, so the list stayed open when the pointer was back inside
+      // the window (over its see-through part) as the menu closed.
       if (this.closed || this.window.isDestroyed()) return;
-      const cursor = screen.getCursorScreenPoint(), bounds = this.window.getBounds();
-      if (cursor.x < bounds.x || cursor.y < bounds.y || cursor.x >= bounds.x + bounds.width || cursor.y >= bounds.y + bounds.height) this.setExpanded(false);
+      if (!this.wanted || this.pointerOutside()) this.setExpanded(false);
     } });
   }
   private setNotice(notice: PetNotice | null) {
