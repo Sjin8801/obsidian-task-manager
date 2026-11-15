@@ -459,6 +459,25 @@ ConvertTo-Json -Compress -InputObject @{ r = $c.R; g = $c.G; b = $c.B; window = 
   await desktop!.evaluate(() => { (globalThis as any).__cursor = null; });
   await pet.locator('.pet-button').hover(); await pet.locator('.peek').waitFor();
   assert.equal(await passThrough(), false, 'and the widget takes the pointer when it comes back');
+  // A clicked button keeps the focus, and gets it again whenever Windows hands the window the focus back. That must not open the list
+  // while the pointer is somewhere else: nothing closed it again, so it sat open over other windows.
+  const pointerAway = (away: boolean) => desktop!.evaluate((_, away) => { (globalThis as any).__cursor = away ? { x: -5000, y: -5000 } : null; }, away);
+  await pet.locator('.pet-button').evaluate((button: HTMLElement) => button.focus());
+  await pointerAway(true); await pet.locator('.peek').waitFor({ state: 'detached', timeout: 2000 });
+  await pet.locator('.pet-button').evaluate((button: HTMLElement) => { button.blur(); button.focus(); });
+  await delay(1000);
+  assert.equal(await pet.locator('.peek').count(), 0, 'focus coming back to a clicked button does not open the list');
+  await pet.locator('.pet-button').evaluate((button: HTMLElement) => button.blur());
+  // The pointer left while the status menu was open, so the list was kept for the menu. It closes with the menu, also when the pointer
+  // is back over the see-through part of the window by then (the page had already asked, and does not ask twice).
+  await pointerAway(false); await pet.locator('.pet-button').hover(); await pet.locator('.peek').waitFor();
+  await desktop!.evaluate(({ Menu }) => { const original = Menu.prototype.popup; Menu.prototype.popup = function (options) { Menu.prototype.popup = original; (globalThis as any).__menuClosed = options?.callback; }; });
+  await pet.locator('.pet-task').first().click({ button: 'right' });
+  await pointerAway(true); await delay(600);
+  assert.equal(await pet.locator('.peek').count(), 1, 'the list stays while the status menu is open');
+  await pointerAway(false); await desktop!.evaluate(() => (globalThis as any).__menuClosed());
+  await pet.locator('.peek').waitFor({ state: 'detached', timeout: 2000 });
+  await pet.locator('.pet-button').hover(); await pet.locator('.peek').waitFor();
   assert.equal((await settledLayout()).window, closedHeight);
   // Sample the window in the main process and the three subtask slots in the page while the pointer moves onto the parent.
   await desktop!.evaluate(({ BrowserWindow }) => {

@@ -169,7 +169,9 @@ function Pet() {
         {(error || view.settingsError) && <p className="error" role="alert">{error || t('위치·설정을 저장하지 못했어요.')}</p>}
       </div>
     </section>}
-    <button className="pet-button" aria-label={t('{label} · 작업 앱 열기', { label })} onFocus={expand}
+    {/* Focus opens the list for the keyboard only. A clicked button keeps the focus, and gets it again each time Windows hands the window
+        the focus back (the window in front closed), which opened the list with the pointer nowhere near. */}
+    <button className="pet-button" aria-label={t('{label} · 작업 앱 열기', { label })} onFocus={e => { if (e.currentTarget.matches(':focus-visible')) expand(); }}
       onPointerDown={e => { if (e.button !== 0) return; suppressed.current = false; pointer.current = { id: e.pointerId, x: e.screenX, y: e.screenY, moved: false }; e.currentTarget.setPointerCapture(e.pointerId); }}
       onPointerMove={e => {
         const p = pointer.current; if (!p) { expand(); return; } if (p.id !== e.pointerId) return;
